@@ -1,0 +1,37 @@
+# 機甲倖存者
+
+類吸血鬼倖存者的機甲生存動作遊戲，全繁體中文，瀏覽器直接玩。
+
+**線上遊玩：https://kevinchu1110.github.io/mecha-survivors/**
+
+## 玩法
+- 自動射擊，只需要移動；撿經驗升級，三選一強化。
+- 每 2 分鐘出現一隻首領，擊破後從三張獎勵卡擇一：**首領武器**（永久解鎖）、**極限突破**（武器等級上限 +2）、**協同增幅器**（所有協同加成 +5%）。
+- 持有特定屬性組合的武器會觸發協同（雷暴、熔爆、超導……），提供攻擊、攻速或移速加成。
+- 撐到 12:00 或擊破終焉機神即通關。
+
+| 操作 | 鍵盤 | 手機 |
+|---|---|---|
+| 移動 | WASD／方向鍵 | 螢幕拖曳 |
+| 衝刺 | Space／Shift | 衝刺鈕 |
+| 大招 | E（擊殺累積能量） | 大招鈕 |
+| 暫停／靜音 | P／M | — |
+
+## 開發
+純靜態網頁，沒有建置步驟：
+
+```bash
+python3 -m http.server 8000   # 然後開 http://localhost:8000
+```
+
+- `js/data.js`：武器、被動、協同、敵人、首領資料
+- `js/game.js`：引擎、繪製、卡片介面
+
+玩法設計受 Rockman X Survivors 的獎勵卡與協同系統啟發。本專案不使用任何 CAPCOM 的角色、圖像或音樂。
+
+## 素材與授權
+程式碼採 MIT 授權。素材皆為 CC0：
+- 主角：[The Robot – Free Sprite](https://opengameart.org/content/the-robot-free-sprite)（pzUH）
+- 敵人：[Topdown Shooter](https://opengameart.org/content/topdown-shooter)（Kenney）
+- 音樂：[Boss Fight 2](https://opengameart.org/content/boss-fight-2)（ansimuz）
+- 音效：以 WebAudio 即時合成

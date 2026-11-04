@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>機甲倖存者</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud" hidden>
+  <div class="bars">
+    <div class="bar hp"><i id="hpFill"></i><span id="hpTxt"></span></div>
+    <div class="bar xp"><i id="xpFill"></i><span id="lvTxt"></span></div>
+  </div>
+  <div id="timer">00:00</div>
+  <div id="gigaBox"><b>E</b><i id="gigaFill"></i></div>
+  <div id="weapons"></div>
+  <div id="synergies"></div>
+  <div id="bossBar" hidden><span id="bossName"></span><div class="bar boss"><i id="bossFill"></i></div></div>
+</div>
+
+<div id="touch" hidden>
+  <button id="tDash">衝刺</button>
+  <button id="tGiga">大招</button>
+</div>
+
+<section id="title" class="screen">
+  <h1><span>機甲</span>倖存者</h1>
+  <button id="btnStart" class="big">開始</button>
+  <table class="keys">
+    <tr><td>WASD／方向鍵</td><td>移動</td></tr>
+    <tr><td>Space／Shift</td><td>衝刺</td></tr>
+    <tr><td>E</td><td>大招</td></tr>
+    <tr><td>P</td><td>暫停</td></tr>
+    <tr><td>M</td><td>靜音</td></tr>
+  </table>
+  <footer>素材：pzUH、Kenney、ansimuz（皆為 CC0）　<a href="https://github.com/KevinChu1110/mecha-survivors" target="_blank" rel="noopener">GitHub</a></footer>
+</section>
+
+<section id="cards" class="screen" hidden>
+  <div id="cardsHead"></div>
+  <div id="cardsRow"></div>
+  <div id="cardsFoot"></div>
+</section>
+
+<section id="pause" class="screen" hidden>
+  <h2>暫停</h2>
+  <button id="btnResume" class="big">繼續</button>
+</section>
+
+<section id="over" class="screen" hidden>
+  <h2 id="overTitle"></h2>
+  <table class="keys" id="overStats"></table>
+  <button id="btnAgain" class="big">再來一局</button>
+</section>
+
+<script src="js/data.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
