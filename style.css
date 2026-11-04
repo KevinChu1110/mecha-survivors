@@ -2,7 +2,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden;
   font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
-canvas{position:fixed;inset:0;display:block}
+#cv{position:fixed;inset:0;display:block}
 [hidden]{display:none!important}
 .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
   background:radial-gradient(ellipse at center,rgba(8,26,60,.82),rgba(2,6,16,.94));z-index:10;padding:16px}
@@ -38,7 +38,7 @@ footer a{color:inherit}
 @keyframes pulse{to{box-shadow:0 0 26px var(--gold)}}
 #weapons{position:absolute;left:14px;bottom:12px;display:flex;gap:6px;flex-wrap:wrap;max-width:60vw}
 .wchip{min-width:46px;padding:3px 6px;text-align:center;font-size:12px;background:rgba(5,16,40,.8);border:1px solid var(--blue)}
-.wchip b{display:block;font-size:20px;line-height:1.1}
+.wchip b{display:block;width:24px;height:24px;margin:0 auto 2px;color:var(--blue)}
 #synergies{position:absolute;right:14px;bottom:12px;text-align:right;font-size:13px;line-height:1.5;text-shadow:0 0 4px #000}
 #synergies em{font-style:normal;color:var(--gold)}
 #bossBar{position:absolute;top:52px;left:50%;transform:translateX(-50%);text-align:center;font-size:14px;letter-spacing:.2em}
@@ -59,9 +59,10 @@ footer a{color:inherit}
 .card .tag{position:absolute;top:-14px;left:50%;transform:translateX(-50%);padding:2px 16px;font-size:12px;font-weight:800;letter-spacing:.12em;
   background:#06112a;border:2px solid var(--c);color:var(--c);white-space:nowrap}
 .card .head{display:flex;align-items:center;gap:10px;margin-top:8px}
-.card .ico{width:50px;height:50px;border:2px solid var(--c);display:grid;place-items:center;font-size:28px;background:rgba(0,0,0,.4);flex:none}
+.card .ico{width:50px;height:50px;border:2px solid var(--c);display:grid;place-items:center;background:rgba(0,0,0,.4);flex:none;color:var(--c);padding:8px}
+.ico-svg{width:100%;height:100%;display:block}
 .card .nm{font-size:18px;font-weight:800;line-height:1.2}
-.card .art{height:88px;display:grid;place-items:center;font-size:54px;filter:drop-shadow(0 0 10px var(--c))}
+.card .art{height:88px;display:flex;gap:6px;align-items:center;justify-content:center;color:var(--c);filter:drop-shadow(0 0 10px var(--c))}
 .card .ds{font-size:13px;line-height:1.5;min-height:58px;opacity:.92}
 .card .rows{border:2px solid var(--c);border-radius:6px;padding:4px 10px;margin-top:6px;min-height:56px}
 .card .rows div{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
@@ -70,4 +71,16 @@ footer a{color:inherit}
 
 #touch{position:fixed;right:14px;bottom:60px;z-index:6;display:flex;flex-direction:column;gap:12px}
 #touch button{width:64px;height:64px;border-radius:50%;border:2px solid var(--gold);background:rgba(10,20,40,.7);color:var(--ink);font:inherit;font-size:13px}
-@media (max-width:760px){.card{width:44vw;min-width:150px}.card .art{height:50px;font-size:34px}.card .ds{min-height:0}}
+@media (max-width:760px){.card{width:44vw;min-width:150px}.card .art{height:50px}.card .art .ico-svg{width:40px!important;height:40px!important}.card .ds{min-height:0}}
+
+#chars{display:flex;gap:clamp(8px,1.6vw,18px);flex-wrap:wrap;justify-content:center;max-width:1000px}
+.char{font:inherit;color:var(--ink);width:210px;padding:10px 12px;text-align:left;cursor:pointer;background:linear-gradient(#0a1a3a,#06112a);border:2px solid #2a4a7c;border-radius:6px;transition:transform .12s}
+.char:hover{transform:translateY(-4px)}
+.char.on{border-color:var(--gold);box-shadow:0 0 18px rgba(240,184,46,.45)}
+.char .pt{height:96px;display:grid;place-items:center}
+.char b{font-size:20px;display:block}
+.char em{font-style:normal;color:var(--blue);font-size:13px}
+.char p{font-size:12.5px;line-height:1.5;margin:6px 0;opacity:.9;min-height:56px}
+.char u{display:block;text-decoration:none;color:var(--gold);font-weight:700}
+.char small{font-size:12px;opacity:.7}
+@media (max-width:760px){.char{width:44vw}.char p{min-height:0}}

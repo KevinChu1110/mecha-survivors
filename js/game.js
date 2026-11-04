@@ -32,18 +32,24 @@ async function loadAll() {
   }
   for (const k of ['robot', 'zombie', 'soldier']) jobs.push(loadImg(`assets/enemy/${k}.png`).then(im => IMG[k] = im));
   await Promise.all(jobs);
-  // 色相變體
-  IMG.tint = {};
-  const tint = (im, hue, key) => {
-    const c = document.createElement('canvas'); c.width = im.width || 1; c.height = im.height || 1;
-    const x = c.getContext('2d'); try { x.filter = `hue-rotate(${hue}deg) saturate(1.3)`; } catch {}
-    x.drawImage(im, 0, 0); IMG.tint[key] = c;
-  };
-  tint(IMG.robot, 200, 'robot200');
-  BOSSES.forEach((b, i) => {
-    IMG.tint['boss' + i] = IMG.hero.Run.map(f => { const c = document.createElement('canvas'); c.width = f.width; c.height = f.height;
-      const x = c.getContext('2d'); try { x.filter = `hue-rotate(${b.hue}deg) saturate(1.4) brightness(.95)`; } catch {} x.drawImage(f, 0, 0); return c; });
-  });
+  // 色相變體（像素運算，Safari 也能用）
+  IMG.tint = {}; IMG.char = {};
+  IMG.tint.robot200 = tintImg(IMG.robot, 200, 1);
+  BOSSES.forEach((b, k) => IMG.tint['boss' + k] = IMG.hero.Run.map(f => tintImg(f, b.hue, .95)));
+  for (const c of CHARS) { IMG.char[c.id] = {}; for (const set of ['Idle', 'Run', 'RunShoot']) IMG.char[c.id][set] = IMG.hero[set].map(f => c.hue || c.br !== 1 ? tintImg(f, c.hue, c.br) : f); }
+}
+function tintImg(im, hue, br) {
+  const c = document.createElement('canvas'); c.width = im.width || 1; c.height = im.height || 1;
+  const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+  const d = x.getImageData(0, 0, c.width, c.height), a = d.data, r = hue * Math.PI / 180, co = Math.cos(r), si = Math.sin(r);
+  const m = [.213 + .787 * co - .213 * si, .715 - .715 * co - .715 * si, .072 - .072 * co + .928 * si,
+             .213 - .213 * co + .143 * si, .715 + .285 * co + .140 * si, .072 - .072 * co - .283 * si,
+             .213 - .213 * co - .787 * si, .715 - .715 * co + .715 * si, .072 + .928 * co + .072 * si];
+  for (let k = 0; k < a.length; k += 4) {
+    const R = a[k], G = a[k + 1], B = a[k + 2];
+    a[k] = Math.min(255, (m[0] * R + m[1] * G + m[2] * B) * br); a[k + 1] = Math.min(255, (m[3] * R + m[4] * G + m[5] * B) * br); a[k + 2] = Math.min(255, (m[6] * R + m[7] * G + m[8] * B) * br);
+  }
+  x.putImageData(d, 0, 0); return c;
 }
 
 // ───────── 音效（WebAudio 合成）＋音樂 ─────────
@@ -99,11 +105,13 @@ $('#tGiga').addEventListener('touchstart', e => { e.stopPropagation(); if (S.mod
 // ───────── 狀態 ─────────
 const S = { mode: 'title', cards: null };
 let G = null;
-function newGame() {
+function newGame(charId) {
+  const ch = CHARS.find(c => c.id === charId) || CHARS[0];
   G = {
+    ch, shotN: 0, shieldOn: false, bcd: 0, burstAng: 0, dashHit: new Set(),
     t: 0, kills: 0, spawnAcc: 0, nextBoss: 0, bossIdx: 0, boss: null,
-    p: { x: 0, y: 0, hp: 100, maxHp: 100, lv: 1, xp: 0, face: 1, inv: 0, dashT: 0, dashCd: 0, dashDx: 1, dashDy: 0, anim: 0, shoot: 0, moving: false },
-    pas: {}, wp: { buster: 1 }, brk: {}, wcd: {}, amp: 0, giga: 0, unlocked: new Set(['buster', 'thunder', 'cyclone']),
+    p: { x: 0, y: 0, hp: ch.hp, maxHp: ch.hp, lv: 1, xp: 0, face: 1, inv: 0, dashT: 0, dashCd: 0, dashDx: 1, dashDy: 0, anim: 0, shoot: 0, moving: false },
+    pas: {}, wp: Object.fromEntries(ch.start.map(id => [id, 1])), brk: {}, wcd: {}, amp: 0, giga: 0, unlocked: new Set(Object.keys(WEAPONS).filter(id => WEAPONS[id].base)),
     en: [], pb: [], eb: [], gems: [], fx: [], txt: [], orbs: 0, orbAng: 0, orbHit: new WeakMap(),
     shake: 0, rerolls: 2, pendingLevels: 0, done: false,
   };
@@ -156,6 +164,9 @@ function killEnemy(e) {
 }
 function hurtPlayer(d) {
   const p = G.p; if (p.inv > 0) return;
+  if (G.shieldOn) { const lv = G.wp.barrier || 1, R = 100 + 10 * lv; G.shieldOn = false; G.bcd = Math.max(5, 12 - lv); p.inv = .5; sfx('ice'); G.shake = .15;
+    G.fx.push({ k: 'nova', x: p.x, y: p.y, R, t: .35, T: .35, c: '#7fe0ff' }); const dm = (15 + 6 * lv) * (G.ch.id === 'shade' ? 1.4 : 1);
+    for (const e of G.boss ? [...G.en, G.boss] : G.en) if (!e.dead && Math.hypot(e.x - p.x, e.y - p.y) < R + e.r) hurtEnemy(e, dm / atkMul(), 30, Math.atan2(e.y - p.y, e.x - p.x)); return; }
   p.hp -= d; p.inv = .6; G.shake = .25; sfx('hurt'); addText(p.x, p.y - 40, '-' + d, '#ff6070');
   if (p.hp <= 0) gameOver(false);
 }
@@ -163,7 +174,8 @@ function dash() {
   const p = G.p; if (p.dashCd > 0) return;
   let dx = 0, dy = 0; inputDir(v => { dx = v.x; dy = v.y; });
   if (!dx && !dy) dx = p.face;
-  const l = Math.hypot(dx, dy); p.dashDx = dx / l; p.dashDy = dy / l; p.dashT = .18; p.dashCd = 1.4; p.inv = Math.max(p.inv, .22); sfx('dash');
+  const l = Math.hypot(dx, dy); p.dashDx = dx / l; p.dashDy = dy / l; p.dashT = .18; p.dashCd = G.ch.dashCd; p.inv = Math.max(p.inv, .22); sfx('dash'); G.dashHit = new Set();
+  if (G.ch.id === 'fang') for (let i = 0; i < 8; i++) { const a = i * .7854; G.pb.push({ x: p.x, y: p.y, vx: Math.cos(a) * 480, vy: Math.sin(a) * 480, dmg: 16 + p.lv * 2, life: .8, r: 6, pierce: 1, hit: new Set(), c: '#d49bff' }); }
 }
 function giga() {
   if (G.giga < 100) return;
@@ -185,15 +197,31 @@ function inputDir(cb) {
 function fireWeapons(dt) {
   const p = G.p;
   for (const [id, lv] of Object.entries(G.wp)) {
-    if (id === 'cyclone') continue;
+    if (id === 'cyclone' || id === 'barrier') continue;
     G.wcd[id] = (G.wcd[id] || 0) - dt * rateMul(); if (G.wcd[id] > 0) continue;
     const k = pwr(id);
     if (id === 'buster') {
       const t = nearest(p, 520); if (!t) continue;
       const base = Math.atan2(t.y - p.y, t.x - p.x), n = 1 + (lv >= 3) + (lv >= 5);
       for (let i = 0; i < n; i++) { const a = base + (i - (n - 1) / 2) * .13;
-        G.pb.push({ x: p.x, y: p.y, vx: Math.cos(a) * 560, vy: Math.sin(a) * 560, dmg: (10 + 4 * lv) * k, life: 1.1, r: 6, pierce: lv >= 5 ? 2 : 0, hit: new Set(), c: '#7fe9ff' }); }
+        const ch = G.ch.id === 'volt' && i === 0 && G.shotN % 6 === 5; G.pb.push({ x: p.x, y: p.y, vx: Math.cos(a) * 560, vy: Math.sin(a) * 560, dmg: (10 + 4 * lv) * k * (ch ? 3 : 1), life: 1.1, r: ch ? 12 : 6, pierce: ch ? 5 : lv >= 5 ? 2 : 0, hit: new Set(), c: ch ? '#fff3a0' : '#7fe9ff' }); } G.shotN++;
       p.shoot = .25; p.face = Math.cos(base) >= 0 ? 1 : -1; sfx('shot'); G.wcd[id] = Math.max(.18, .62 - .04 * lv);
+    } else if (id === 'saber') {
+      const t = nearest(p, 200 + 8 * lv); if (!t) continue; const a = Math.atan2(t.y - p.y, t.x - p.x), R = 100 + 6 * lv, half = lv >= 4 ? 3.2 : .95;
+      for (const e of G.boss ? [...G.en, G.boss] : G.en) { if (e.dead || Math.hypot(e.x - p.x, e.y - p.y) > R + e.r) continue;
+        let da = Math.atan2(e.y - p.y, e.x - p.x) - a; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) < half) hurtEnemy(e, (18 + 6 * lv) * k, 16, a); }
+      G.fx.push({ k: 'slash', x: p.x, y: p.y, a, R, arc: half, t: .22, T: .22 }); p.face = Math.cos(a) >= 0 ? 1 : -1; p.shoot = .2; sfx('zap'); G.wcd[id] = Math.max(.45, .95 - .07 * lv);
+    } else if (id === 'sniper') {
+      const seen = new Set(); let t = nearest(p, 760); if (!t) continue;
+      for (let j = 0; j < 1 + (lv >= 4); j++) { if (!t) break; seen.add(t); const a = Math.atan2(t.y - p.y, t.x - p.x), L = 820, ex = p.x + Math.cos(a) * L, ey = p.y + Math.sin(a) * L;
+        for (const e of G.boss ? [...G.en, G.boss] : G.en) { if (e.dead) continue; const dx = ex - p.x, dy = ey - p.y, u = Math.max(0, Math.min(1, ((e.x - p.x) * dx + (e.y - p.y) * dy) / (L * L)));
+          if (Math.hypot(p.x + dx * u - e.x, p.y + dy * u - e.y) < e.r + 10) hurtEnemy(e, (40 + 14 * lv) * k, 10, a); }
+        G.fx.push({ k: 'beam', x: p.x, y: p.y - 10, ex, ey: ey - 10, t: .16, T: .16 }); p.face = Math.cos(a) >= 0 ? 1 : -1; t = nearest(p, 760, seen); }
+      p.shoot = .25; sfx('boom'); G.wcd[id] = Math.max(.9, 1.9 - .12 * lv);
+    } else if (id === 'burst') {
+      const n = Math.min(8, 2 + Math.floor(lv / 2) * 2); G.burstAng += .43;
+      for (let i = 0; i < n; i++) { const a = G.burstAng + i * 6.283 / n; G.pb.push({ x: p.x, y: p.y, vx: Math.cos(a) * 430, vy: Math.sin(a) * 430, dmg: (6 + 2.5 * lv) * k, life: .95, r: 5, pierce: lv >= 5 ? 1 : 0, hit: new Set(), c: '#e0a8ff' }); }
+      p.shoot = .2; sfx('shot'); G.wcd[id] = Math.max(.22, .5 - .04 * lv);
     } else if (id === 'thunder') {
       let t = nearest(p, 420); if (!t) continue; const seen = new Set(), pts = [{ x: p.x, y: p.y - 20 }];
       for (let j = 0; j < 2 + lv && t; j++) { seen.add(t); pts.push({ x: t.x, y: t.y }); hurtEnemy(t, (14 + 5 * lv) * k); t = nearest(t, 220, seen); }
@@ -215,6 +243,7 @@ function fireWeapons(dt) {
       G.fx.push({ k: 'nova', x: p.x, y: p.y, R, t: .4, T: .4 }); sfx('ice'); G.wcd[id] = Math.max(1.6, 3.2 - .15 * lv);
     }
   }
+  if (G.wp.barrier && !G.shieldOn) { G.bcd -= dt * rateMul(); if (G.bcd <= 0) G.shieldOn = true; }
   // 旋風：常駐環繞
   const lv = G.wp.cyclone;
   if (lv) {
@@ -277,13 +306,13 @@ function rowsFor(id, lv) { return WEAPONS[id].rows(lv); }
 function weaponCard(id) {
   const w = WEAPONS[id], lv = G.wp[id] || 0, next = lv + 1;
   const rows = rowsFor(id, next).map((r, i) => lv ? [r[0], `${rowsFor(id, lv)[i][1]} → ${r[1]}`] : r);
-  return { type: 'weapon', cls: '', tag: lv ? `武器 Lv${lv}→${next}` : '新武器', icon: w.icon, name: w.name, art: w.icon, desc: w.desc, rows, apply: () => { G.wp[id] = next; } };
+  return { type: 'weapon', cls: '', tag: lv ? `武器 Lv${lv}→${next}` : '新武器', icon: ico(id), name: w.name, art: ico(id, 72), desc: w.desc, rows, apply: () => { G.wp[id] = next; } };
 }
 function passiveCard(id) {
   const p = PASSIVES[id], n = (G.pas[id] || 0) + 1;
-  return { type: 'pas', cls: 'pass', tag: `強化 ${n}/${p.max}`, icon: p.icon, name: p.name, art: p.icon, desc: p.desc, rows: [], apply: () => { G.pas[id] = n; if (id === 'armor') { G.p.maxHp += 20; G.p.hp = Math.min(G.p.maxHp, G.p.hp + 20); } } };
+  return { type: 'pas', cls: 'pass', tag: `強化 ${n}/${p.max}`, icon: ico(id), name: p.name, art: ico(id, 72), desc: p.desc, rows: [], apply: () => { G.pas[id] = n; if (id === 'armor') { G.p.maxHp += 20; G.p.hp = Math.min(G.p.maxHp, G.p.hp + 20); } } };
 }
-const healCard = () => ({ type: 'heal', cls: 'heal', tag: '修復', icon: '💊', name: '緊急維修', art: '💊', desc: '回復 40% 最大生命。', rows: [], apply: () => { G.p.hp = Math.min(G.p.maxHp, G.p.hp + G.p.maxHp * .4); } });
+const healCard = () => ({ type: 'heal', cls: 'heal', tag: '修復', icon: ico('heal'), name: '緊急維修', art: ico('heal', 72), desc: '回復 40% 最大生命。', rows: [], apply: () => { G.p.hp = Math.min(G.p.maxHp, G.p.hp + G.p.maxHp * .4); } });
 function levelOffers() {
   const pool = [];
   for (const id of Object.keys(G.wp)) if (G.wp[id] < wmax(id)) pool.push({ w: 3, c: () => weaponCard(id) });
@@ -326,10 +355,10 @@ function bossReward(def) {
   if (nw) { const wc = weaponCard(nw); cards.push({ ...wc, cls: 'boss', tag: 'BOSS 武器', desc: '取得新的首領武器。選擇後永久解鎖，之後升級卡片也會出現。', apply: () => { G.wp[nw] = 1; G.unlocked.add(nw); store.set('unlock_' + nw, true); } }); }
   else { const own = Object.keys(G.wp).filter(id => G.wp[id] < wmax(id)); const id = own.length ? pick(own) : 'buster'; const wc = weaponCard(id); cards.push({ ...wc, cls: 'boss', tag: 'BOSS 強化', desc: '首領核心使武器進化。', apply: () => { G.wp[id] = Math.min(wmax(id), (G.wp[id] || 0) + 2); } }); }
   const ids = Object.keys(G.wp).sort((a, b) => G.wp[b] - G.wp[a]); const tgt = ids[0];
-  cards.push({ type: 'limit', cls: 'limit', tag: '突破', icon: WEAPONS[tgt].icon, name: '極限突破', art: `<span style="font-size:36px">${WEAPONS[tgt].icon}⚡</span>`, desc: `${WEAPONS[tgt].name}突破極限：等級上限 +2，並立刻升 1 級。`,
+  cards.push({ type: 'limit', cls: 'limit', tag: '突破', icon: ico('limit'), name: '極限突破', art: ico(tgt, 56) + ico('limit', 40), desc: `${WEAPONS[tgt].name}突破極限：等級上限 +2，並立刻升 1 級。`,
     rows: [['等級上限', `${wmax(tgt)} → ${wmax(tgt) + 2}`]], apply: () => { G.brk[tgt] = (G.brk[tgt] || 0) + 1; G.wp[tgt]++; } });
   const n = synList().length, v = n * (SYN_BASE + SYN_AMP * G.amp);
-  cards.push({ type: 'syn', cls: 'syn', tag: '協同', icon: '🔗', name: '協同增幅器', art: '🔗', desc: '所有協同的加成 +5%，包含之後才完成的協同。',
+  cards.push({ type: 'syn', cls: 'syn', tag: '協同', icon: ico('link'), name: '協同增幅器', art: ico('link', 72), desc: '所有協同的加成 +5%，包含之後才完成的協同。',
     rows: [['目前協同', n], ['總加成', `+${Math.round(v * 100)}% → +${Math.round(n * (SYN_BASE + SYN_AMP * (G.amp + 1)) * 100)}%`]], apply: () => { G.amp++; } });
   showCards(`首領擊破<small>${def.name}</small>`, cards, '選擇一項獎勵');
   sfx('level');
@@ -337,7 +366,7 @@ function bossReward(def) {
 
 // ───────── HUD ─────────
 function hudRebuild() {
-  $('#weapons').innerHTML = Object.entries(G.wp).map(([id, lv]) => `<div class="wchip"><b>${WEAPONS[id].icon}</b>Lv${lv}${lv >= wmax(id) ? ' MAX' : ''}</div>`).join('');
+  $('#weapons').innerHTML = Object.entries(G.wp).map(([id, lv]) => `<div class="wchip"><b>${ico(id)}</b>Lv${lv}${lv >= wmax(id) ? ' MAX' : ''}</div>`).join('');
   const sl = synList();
   $('#synergies').innerHTML = sl.map(s => `${s.name}　<em>${s.label} +${Math.round((SYN_BASE + SYN_AMP * G.amp) * 100)}%</em>`).join('<br>');
 }
@@ -355,8 +384,9 @@ function update(dt) {
   p.inv = Math.max(0, p.inv - dt); p.dashCd = Math.max(0, p.dashCd - dt); p.shoot = Math.max(0, p.shoot - dt);
   // 移動
   let mv = { x: 0, y: 0 }; inputDir(v => mv = v);
-  const sp = 190 * moveMul();
-  if (p.dashT > 0) { p.dashT -= dt; p.x += p.dashDx * 620 * dt; p.y += p.dashDy * 620 * dt; }
+  const sp = 190 * moveMul() * G.ch.spd;
+  if (p.dashT > 0) { p.dashT -= dt; p.x += p.dashDx * 620 * dt; p.y += p.dashDy * 620 * dt;
+    if (G.ch.id === 'blade') for (const e of G.boss ? [...G.en, G.boss] : G.en) if (!e.dead && !G.dashHit.has(e) && Math.hypot(e.x - p.x, e.y - p.y) < e.r + 46) { G.dashHit.add(e); hurtEnemy(e, 38 + p.lv * 4, 18, Math.atan2(p.dashDy, p.dashDx)); G.fx.push({ k: 'slash', x: e.x, y: e.y, a: Math.atan2(p.dashDy, p.dashDx), R: 50, arc: 1, t: .18, T: .18 }); } }
   else { p.x += mv.x * sp * dt; p.y += mv.y * sp * dt; }
   p.moving = !!(mv.x || mv.y); if (mv.x) p.face = mv.x > 0 ? 1 : -1; p.anim += dt;
   // 生怪
@@ -471,13 +501,14 @@ function draw() {
   if (p.inv > 0 && G.t > .1 && p.dashT <= 0 && p.hp < p.maxHp) { ctx.fillStyle = `rgba(255,40,60,${Math.min(.18, p.inv * .3)})`; ctx.fillRect(0, 0, W, H); }
 }
 function drawHero() {
-  const p = G.p; const set = p.shoot > 0 && p.moving ? 'RunShoot' : p.moving ? 'Run' : 'Idle'; const fr = IMG.hero[set];
+  const p = G.p; const set = p.shoot > 0 && p.moving ? 'RunShoot' : p.moving ? 'Run' : 'Idle'; const fr = IMG.char[G.ch.id][set];
   const im = fr[((p.anim * (set === 'Idle' ? 8 : 14)) | 0) % fr.length]; const h = 96, w = im.width / im.height * h;
   ctx.save(); ctx.translate(p.x, p.y);
   ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(0, 28, 22, 8, 0, 0, 6.283); ctx.fill();
   if (p.dashT > 0) { ctx.globalAlpha = .6; }
   else if (p.inv > 0 && ((G.t * 20) | 0) % 2) ctx.globalAlpha = .4;
   ctx.scale(p.face, 1); ctx.drawImage(im, -w / 2, -h / 2 - 8, w, h); ctx.restore();
+  if (G.shieldOn) { ctx.save(); ctx.strokeStyle = 'rgba(127,224,255,.85)'; ctx.fillStyle = 'rgba(127,224,255,.12)'; ctx.lineWidth = 3; ctx.shadowColor = '#7fe0ff'; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(p.x, p.y - 6, 46 + Math.sin(G.t * 6) * 2, 0, 6.283); ctx.fill(); ctx.stroke(); ctx.restore(); }
 }
 function drawBoss(b) {
   const fr = IMG.tint['boss' + b.idx], im = fr[((G.t * 10) | 0) % fr.length]; const h = 96 * b.def.scale, w = im.width / im.height * h;
@@ -492,6 +523,9 @@ function drawFx(f) {
   if (f.k === 'bolt') { ctx.strokeStyle = '#fff36a'; ctx.shadowColor = '#ffe14d'; ctx.shadowBlur = 14; ctx.lineWidth = 3; ctx.beginPath(); f.pts.forEach((q, i) => i ? ctx.lineTo(q.x + rnd(-6, 6), q.y + rnd(-6, 6)) : ctx.moveTo(q.x, q.y)); ctx.stroke(); ctx.shadowBlur = 0; }
   else if (f.k === 'nova') { ctx.strokeStyle = f.c || '#9fe6ff'; ctx.globalAlpha = 1 - k; ctx.lineWidth = 6 * (1 - k) + 1; ctx.beginPath(); ctx.arc(f.x, f.y, f.R * (.3 + .7 * k), 0, 6.283); ctx.stroke(); ctx.globalAlpha = 1; }
   else if (f.k === 'flame') { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a); ctx.globalAlpha = (1 - k) * .7; const g = ctx.createRadialGradient(0, 0, 10, 0, 0, f.R); g.addColorStop(0, '#fff3a0'); g.addColorStop(.5, '#ff8a20'); g.addColorStop(1, 'rgba(255,60,0,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, f.R, -.6, .6); ctx.closePath(); ctx.fill(); ctx.restore(); ctx.globalAlpha = 1; }
+  else if (f.k === 'slash') { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.a); ctx.globalAlpha = (1 - k) * .9; const g = ctx.createRadialGradient(0, 0, f.R * .3, 0, 0, f.R); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(.8, '#ff9ab0'); g.addColorStop(1, '#fff');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, f.R * (.6 + .4 * k), -f.arc, f.arc); ctx.closePath(); ctx.fill(); ctx.restore(); ctx.globalAlpha = 1; }
+  else if (f.k === 'beam') { ctx.globalAlpha = 1 - k; ctx.strokeStyle = '#ffffff'; ctx.shadowColor = '#7fe0ff'; ctx.shadowBlur = 16; ctx.lineWidth = 6 * (1 - k) + 1; ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.ex, f.ey); ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
   else if (f.k === 'orb') { ctx.fillStyle = '#b8ffd8'; ctx.shadowColor = '#5dffb0'; ctx.shadowBlur = 14; ctx.beginPath(); ctx.arc(f.x, f.y, 11, 0, 6.283); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(f.x, f.y, 5, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0; }
   else if (f.k === 'puff') { ctx.globalAlpha = 1 - k; ctx.strokeStyle = '#cfe9ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(f.x, f.y, 8 + 22 * k, 0, 6.283); ctx.stroke(); ctx.globalAlpha = 1; }
   else if (f.k === 'giga') { ctx.globalAlpha = (1 - k) * .8; ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 16 * (1 - k) + 2; ctx.beginPath(); ctx.arc(f.x, f.y, 40 + 900 * k, 0, 6.283); ctx.stroke(); ctx.globalAlpha = 1; }
@@ -504,9 +538,15 @@ function frame(ts) {
   if (G && S.mode === 'play') update(dt);
   draw(); requestAnimationFrame(frame);
 }
-function start() { newGame(); setMode('play'); startMusic(); }
+let chosen = store.get('char', 'volt');
+function renderChars() {
+  $('#chars').innerHTML = CHARS.map(c => `<button class="char${c.id === chosen ? ' on' : ''}" data-id="${c.id}"><div class="pt"></div><b>${c.name}</b><em>${c.role}</em><p><u>${c.skill}</u>${c.skillDesc}</p><small>${c.start.map(id => WEAPONS[id].name).join('、')}</small></button>`).join('');
+  document.querySelectorAll('#chars .char').forEach(b => { const c = CHARS.find(x => x.id === b.dataset.id), cv2 = document.createElement('canvas'), im = IMG.char[c.id].Idle[0]; cv2.width = 96; cv2.height = 96; cv2.getContext('2d').drawImage(im, 0, 0, 96, 96 * im.height / im.width); b.querySelector('.pt').appendChild(cv2); });
+}
+$('#chars').addEventListener('click', e => { const b = e.target.closest('.char'); if (!b) return; chosen = b.dataset.id; store.set('char', chosen); document.querySelectorAll('#chars .char').forEach(x => x.classList.toggle('on', x === b)); sfx('card'); });
+function start() { newGame(chosen); setMode('play'); startMusic(); }
 $('#btnStart').addEventListener('click', start);
 $('#btnAgain').addEventListener('click', start);
 $('#btnResume').addEventListener('click', () => setMode('play'));
-loadAll().then(() => { G = null; setMode('title'); requestAnimationFrame(frame); });
+loadAll().then(() => { G = null; renderChars(); setMode('title'); requestAnimationFrame(frame); });
 window.__mecha = { get G() { return G; }, S, BOSSES, update, giga, bossReward, levelUpUI };
