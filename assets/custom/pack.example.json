@@ -1,0 +1,17 @@
+{
+  "chars": [
+    {
+      "id": "my_blade",
+      "base": "blade",
+      "replace": "blade",
+      "info": { "name": "我的角色", "role": "近戰突進" },
+      "height": 96,
+      "facesLeft": false,
+      "frames": {
+        "Idle": ["my_blade/idle1.png", "my_blade/idle2.png"],
+        "Run": ["my_blade/run1.png", "my_blade/run2.png", "my_blade/run3.png"],
+        "RunShoot": ["my_blade/runshoot1.png"]
+      }
+    }
+  ]
+}

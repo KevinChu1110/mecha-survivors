@@ -37,6 +37,9 @@ python3 -m http.server 8000   # 然後開 http://localhost:8000
 
 玩法設計受 Rockman X Survivors 的獎勵卡與協同系統啟發。本專案不使用任何 CAPCOM 的角色、圖像或音樂。
 
+## 自訂素材外掛包
+想在自己的電腦上換成其他角色圖，請看 [assets/custom/README.md](assets/custom/README.md)。外掛包資料夾不會被 git 追蹤，也不會被推上 GitHub。
+
 ## 素材與授權
 程式碼採 MIT 授權。素材皆為 CC0：
 - 主角：[The Robot – Free Sprite](https://opengameart.org/content/the-robot-free-sprite)（pzUH）

@@ -23,6 +23,21 @@ const store = {
 const IMG = {};
 const HERO_ANIM = { Idle: 10, Run: 8, RunShoot: 9, Dead: 10, Slide: 10 };
 function loadImg(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(i); i.src = src; }); }
+const PACK = 'assets/custom/';
+// 選用的素材外掛包：assets/custom/pack.json（不進版控，沒有就略過）
+async function loadPack() {
+  let cfg; try { const r = await fetch(PACK + 'pack.json', { cache: 'no-store' }); if (!r.ok) return; cfg = await r.json(); } catch { return; }
+  for (const e of cfg.chars || []) {
+    const base = CHARS.find(c => c.id === e.base); if (!base || !e.frames || !e.id) continue;
+    const ch = { ...base, ...e.info, id: e.id, kit: base.kit, h: e.height || 96 };
+    const sets = {};
+    for (const [k, list] of Object.entries(e.frames)) sets[k] = await Promise.all(list.map(f => loadImg(PACK + f)));
+    if (!sets.Idle || !sets.Idle.length) continue;
+    sets.Run = sets.Run && sets.Run.length ? sets.Run : sets.Idle; sets.RunShoot = sets.RunShoot && sets.RunShoot.length ? sets.RunShoot : sets.Run;
+    IMG.char[ch.id] = sets; ch.flipArt = !!e.facesLeft;
+    const at = CHARS.findIndex(c => c.id === e.replace); if (at >= 0) CHARS[at] = ch; else CHARS.push(ch);
+  }
+}
 async function loadAll() {
   IMG.hero = {};
   const jobs = [];
@@ -36,7 +51,8 @@ async function loadAll() {
   IMG.tint = {}; IMG.char = {};
   IMG.tint.robot200 = tintImg(IMG.robot, 200, 1);
   BOSSES.forEach((b, k) => IMG.tint['boss' + k] = IMG.hero.Run.map(f => tintImg(f, b.hue, .95)));
-  for (const c of CHARS) { IMG.char[c.id] = {}; for (const set of ['Idle', 'Run', 'RunShoot']) IMG.char[c.id][set] = IMG.hero[set].map(f => c.hue || c.br !== 1 ? tintImg(f, c.hue, c.br) : f); }
+  for (const c of CHARS) { c.kit = c.id; IMG.char[c.id] = {}; for (const set of ['Idle', 'Run', 'RunShoot']) IMG.char[c.id][set] = IMG.hero[set].map(f => c.hue || c.br !== 1 ? tintImg(f, c.hue, c.br) : f); }
+  await loadPack();
 }
 function tintImg(im, hue, br) {
   const c = document.createElement('canvas'); c.width = im.width || 1; c.height = im.height || 1;
@@ -165,7 +181,7 @@ function killEnemy(e) {
 function hurtPlayer(d) {
   const p = G.p; if (p.inv > 0) return;
   if (G.shieldOn) { const lv = G.wp.barrier || 1, R = 100 + 10 * lv; G.shieldOn = false; G.bcd = Math.max(5, 12 - lv); p.inv = .5; sfx('ice'); G.shake = .15;
-    G.fx.push({ k: 'nova', x: p.x, y: p.y, R, t: .35, T: .35, c: '#7fe0ff' }); const dm = (15 + 6 * lv) * (G.ch.id === 'shade' ? 1.4 : 1);
+    G.fx.push({ k: 'nova', x: p.x, y: p.y, R, t: .35, T: .35, c: '#7fe0ff' }); const dm = (15 + 6 * lv) * (G.ch.kit === 'shade' ? 1.4 : 1);
     for (const e of G.boss ? [...G.en, G.boss] : G.en) if (!e.dead && Math.hypot(e.x - p.x, e.y - p.y) < R + e.r) hurtEnemy(e, dm / atkMul(), 30, Math.atan2(e.y - p.y, e.x - p.x)); return; }
   p.hp -= d; p.inv = .6; G.shake = .25; sfx('hurt'); addText(p.x, p.y - 40, '-' + d, '#ff6070');
   if (p.hp <= 0) gameOver(false);
@@ -175,7 +191,7 @@ function dash() {
   let dx = 0, dy = 0; inputDir(v => { dx = v.x; dy = v.y; });
   if (!dx && !dy) dx = p.face;
   const l = Math.hypot(dx, dy); p.dashDx = dx / l; p.dashDy = dy / l; p.dashT = .18; p.dashCd = G.ch.dashCd; p.inv = Math.max(p.inv, .22); sfx('dash'); G.dashHit = new Set();
-  if (G.ch.id === 'fang') for (let i = 0; i < 8; i++) { const a = i * .7854; G.pb.push({ x: p.x, y: p.y, vx: Math.cos(a) * 480, vy: Math.sin(a) * 480, dmg: 16 + p.lv * 2, life: .8, r: 6, pierce: 1, hit: new Set(), c: '#d49bff' }); }
+  if (G.ch.kit === 'fang') for (let i = 0; i < 8; i++) { const a = i * .7854; G.pb.push({ x: p.x, y: p.y, vx: Math.cos(a) * 480, vy: Math.sin(a) * 480, dmg: 16 + p.lv * 2, life: .8, r: 6, pierce: 1, hit: new Set(), c: '#d49bff' }); }
 }
 function giga() {
   if (G.giga < 100) return;
@@ -204,7 +220,7 @@ function fireWeapons(dt) {
       const t = nearest(p, 520); if (!t) continue;
       const base = Math.atan2(t.y - p.y, t.x - p.x), n = 1 + (lv >= 3) + (lv >= 5);
       for (let i = 0; i < n; i++) { const a = base + (i - (n - 1) / 2) * .13;
-        const ch = G.ch.id === 'volt' && i === 0 && G.shotN % 6 === 5; G.pb.push({ x: p.x, y: p.y, vx: Math.cos(a) * 560, vy: Math.sin(a) * 560, dmg: (10 + 4 * lv) * k * (ch ? 3 : 1), life: 1.1, r: ch ? 12 : 6, pierce: ch ? 5 : lv >= 5 ? 2 : 0, hit: new Set(), c: ch ? '#fff3a0' : '#7fe9ff' }); } G.shotN++;
+        const ch = G.ch.kit === 'volt' && i === 0 && G.shotN % 6 === 5; G.pb.push({ x: p.x, y: p.y, vx: Math.cos(a) * 560, vy: Math.sin(a) * 560, dmg: (10 + 4 * lv) * k * (ch ? 3 : 1), life: 1.1, r: ch ? 12 : 6, pierce: ch ? 5 : lv >= 5 ? 2 : 0, hit: new Set(), c: ch ? '#fff3a0' : '#7fe9ff' }); } G.shotN++;
       p.shoot = .25; p.face = Math.cos(base) >= 0 ? 1 : -1; sfx('shot'); G.wcd[id] = Math.max(.18, .62 - .04 * lv);
     } else if (id === 'saber') {
       const t = nearest(p, 200 + 8 * lv); if (!t) continue; const a = Math.atan2(t.y - p.y, t.x - p.x), R = 100 + 6 * lv, half = lv >= 4 ? 3.2 : .95;
@@ -386,7 +402,7 @@ function update(dt) {
   let mv = { x: 0, y: 0 }; inputDir(v => mv = v);
   const sp = 190 * moveMul() * G.ch.spd;
   if (p.dashT > 0) { p.dashT -= dt; p.x += p.dashDx * 620 * dt; p.y += p.dashDy * 620 * dt;
-    if (G.ch.id === 'blade') for (const e of G.boss ? [...G.en, G.boss] : G.en) if (!e.dead && !G.dashHit.has(e) && Math.hypot(e.x - p.x, e.y - p.y) < e.r + 46) { G.dashHit.add(e); hurtEnemy(e, 38 + p.lv * 4, 18, Math.atan2(p.dashDy, p.dashDx)); G.fx.push({ k: 'slash', x: e.x, y: e.y, a: Math.atan2(p.dashDy, p.dashDx), R: 50, arc: 1, t: .18, T: .18 }); } }
+    if (G.ch.kit === 'blade') for (const e of G.boss ? [...G.en, G.boss] : G.en) if (!e.dead && !G.dashHit.has(e) && Math.hypot(e.x - p.x, e.y - p.y) < e.r + 46) { G.dashHit.add(e); hurtEnemy(e, 38 + p.lv * 4, 18, Math.atan2(p.dashDy, p.dashDx)); G.fx.push({ k: 'slash', x: e.x, y: e.y, a: Math.atan2(p.dashDy, p.dashDx), R: 50, arc: 1, t: .18, T: .18 }); } }
   else { p.x += mv.x * sp * dt; p.y += mv.y * sp * dt; }
   p.moving = !!(mv.x || mv.y); if (mv.x) p.face = mv.x > 0 ? 1 : -1; p.anim += dt;
   // 生怪
@@ -502,12 +518,12 @@ function draw() {
 }
 function drawHero() {
   const p = G.p; const set = p.shoot > 0 && p.moving ? 'RunShoot' : p.moving ? 'Run' : 'Idle'; const fr = IMG.char[G.ch.id][set];
-  const im = fr[((p.anim * (set === 'Idle' ? 8 : 14)) | 0) % fr.length]; const h = 96, w = im.width / im.height * h;
+  const im = fr[((p.anim * (set === 'Idle' ? 8 : 14)) | 0) % fr.length]; const h = G.ch.h || 96, w = im.width / im.height * h;
   ctx.save(); ctx.translate(p.x, p.y);
   ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(0, 28, 22, 8, 0, 0, 6.283); ctx.fill();
   if (p.dashT > 0) { ctx.globalAlpha = .6; }
   else if (p.inv > 0 && ((G.t * 20) | 0) % 2) ctx.globalAlpha = .4;
-  ctx.scale(p.face, 1); ctx.drawImage(im, -w / 2, -h / 2 - 8, w, h); ctx.restore();
+  ctx.scale(G.ch.flipArt ? -p.face : p.face, 1); ctx.drawImage(im, -w / 2, -h / 2 - 8, w, h); ctx.restore();
   if (G.shieldOn) { ctx.save(); ctx.strokeStyle = 'rgba(127,224,255,.85)'; ctx.fillStyle = 'rgba(127,224,255,.12)'; ctx.lineWidth = 3; ctx.shadowColor = '#7fe0ff'; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(p.x, p.y - 6, 46 + Math.sin(G.t * 6) * 2, 0, 6.283); ctx.fill(); ctx.stroke(); ctx.restore(); }
 }
 function drawBoss(b) {
