@@ -1,11 +1,11 @@
 :root{--bg:#050a18;--ink:#dff3ff;--blue:#35b0ff;--green:#2fd6a0;--gold:#f0b82e;--red:#ff4d5e}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden;
+html,body{margin:0;height:100%;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;background:var(--bg);color:var(--ink);overflow:hidden;
   font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
 #cv{position:fixed;inset:0;display:block}
 [hidden]{display:none!important}
-.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
-  background:radial-gradient(ellipse at center,rgba(8,26,60,.82),rgba(2,6,16,.94));z-index:10;padding:16px}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:22px;overflow-y:auto;touch-action:pan-y;
+  background:radial-gradient(ellipse at center,rgba(8,26,60,.82),rgba(2,6,16,.94));z-index:10;padding:calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
 h1{font-size:clamp(40px,9vw,88px);margin:0;letter-spacing:.08em;font-style:italic;font-weight:900;
   text-shadow:0 0 24px rgba(53,176,255,.7)}
 h1 span{color:var(--blue)}
@@ -17,7 +17,7 @@ button.big:hover{filter:brightness(1.35)}
 table.keys{border-collapse:collapse;font-size:15px;opacity:.85}
 table.keys td{padding:4px 14px;border-bottom:1px solid rgba(53,176,255,.25)}
 table.keys td:first-child{color:var(--blue);text-align:right}
-footer{position:absolute;bottom:12px;font-size:12px;opacity:.55}
+footer{margin-top:auto;padding-top:6px;text-align:center;font-size:12px;opacity:.55}
 footer a{color:inherit}
 
 /* HUD */
@@ -69,8 +69,6 @@ footer a{color:inherit}
 .card .rows div:last-child{border:0}
 .card .key{position:absolute;right:8px;bottom:-12px;background:#000;border:1px solid var(--c);font-size:11px;padding:0 7px}
 
-#touch{position:fixed;right:14px;bottom:60px;z-index:6;display:flex;flex-direction:column;gap:12px}
-#touch button{width:64px;height:64px;border-radius:50%;border:2px solid var(--gold);background:rgba(10,20,40,.7);color:var(--ink);font:inherit;font-size:13px}
 @media (max-width:760px){.card{width:44vw;min-width:150px}.card .art{height:50px}.card .art .ico-svg{width:40px!important;height:40px!important}.card .ds{min-height:0}}
 
 #chars{display:flex;gap:clamp(8px,1.6vw,18px);flex-wrap:wrap;justify-content:center;max-width:1000px}
@@ -84,3 +82,44 @@ footer a{color:inherit}
 .char u{display:block;text-decoration:none;color:var(--gold);font-weight:700}
 .char small{font-size:12px;opacity:.7}
 @media (max-width:760px){.char{width:44vw}.char p{min-height:0}}
+
+/* 手機：虛擬搖桿與按鈕 */
+#joy{position:fixed;z-index:6;width:108px;height:108px;margin:-54px 0 0 -54px;border-radius:50%;border:2px solid rgba(127,224,255,.55);background:rgba(20,50,90,.22);pointer-events:none}
+#joyKnob{position:absolute;left:50%;top:50%;width:46px;height:46px;border-radius:50%;background:rgba(127,224,255,.45);border:2px solid #7fe0ff;transform:translate(-50%,-50%)}
+#touch{position:fixed;inset:0;z-index:6;pointer-events:none}
+#touch button{pointer-events:auto;position:absolute;border-radius:50%;border:2px solid var(--gold);background:rgba(10,20,40,.72);color:var(--ink);font:inherit;font-size:14px;font-weight:800;touch-action:none;overflow:hidden}
+#tDash{width:76px;height:76px;right:calc(16px + env(safe-area-inset-right));bottom:calc(22px + env(safe-area-inset-bottom))}
+#tGiga{width:62px;height:62px;right:calc(104px + env(safe-area-inset-right));bottom:calc(18px + env(safe-area-inset-bottom));background:linear-gradient(to top,rgba(240,184,46,.5) var(--f,0%),rgba(10,20,40,.72) var(--f,0%))}
+#tGiga.ready{box-shadow:0 0 16px var(--gold)}
+#tPause{width:40px;height:40px;right:calc(12px + env(safe-area-inset-right));top:calc(78px + env(safe-area-inset-top));border-color:rgba(255,255,255,.45);font-size:13px}
+#cardsFoot button{font:inherit;font-size:14px;color:var(--ink);background:rgba(10,30,70,.8);border:2px solid var(--blue);padding:8px 22px;cursor:pointer;border-radius:4px}
+#cardsFoot button:disabled{opacity:.4}
+@media (pointer:coarse){#gigaBox{display:none}table.keys{display:none}}
+@media (max-width:760px){
+  .bars{left:calc(10px + env(safe-area-inset-left));top:calc(8px + env(safe-area-inset-top));width:46vw}
+  #timer{font-size:20px;top:calc(6px + env(safe-area-inset-top))}
+  #bossBar{top:calc(40px + env(safe-area-inset-top));font-size:12px}
+  #gigaBox{right:calc(10px + env(safe-area-inset-right));top:calc(8px + env(safe-area-inset-top));width:44px;height:44px}
+  #weapons{left:calc(8px + env(safe-area-inset-left));max-width:46vw;gap:4px;bottom:calc(8px + env(safe-area-inset-bottom))}
+  .wchip{min-width:36px;padding:2px 4px;font-size:10px}.wchip b{width:18px;height:18px}
+  #synergies{display:none}
+  #cardsRow{flex-direction:column;align-items:center;gap:16px;width:100%}
+  .card{width:min(92vw,420px);min-width:0;padding:10px 12px 8px}
+  .card .art{display:none}.card .rows{min-height:0;margin-top:4px}.card .nm{font-size:16px}.card .ds{font-size:12.5px}
+  .card .key{display:none}
+  #cardsHead{padding:4px 28px}
+  .screen{gap:14px}
+  #chars{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+  .char{width:auto;padding:8px}.char .pt{height:72px}.char b{font-size:17px}.char p{font-size:11.5px;margin:4px 0}
+  button.big{padding:12px 44px}
+}
+@media (max-height:520px) and (orientation:landscape){
+  .screen{gap:8px}h1{font-size:34px}
+  #chars{grid-template-columns:repeat(4,1fr)}.char .pt{height:56px}.char p{display:none}
+  #cardsRow{flex-direction:row;gap:10px}
+  .card{width:30vw;padding:8px}.card .ds{display:none}.card .head{margin-top:6px}.card .ico{width:36px;height:36px;padding:5px}
+  #cardsHead{font-size:22px;padding:2px 24px}
+  #bossBar{top:34px}
+  #tDash{width:64px;height:64px}#tGiga{width:54px;height:54px;right:calc(92px + env(safe-area-inset-right))}
+  #tPause{top:calc(56px + env(safe-area-inset-top))}
+}

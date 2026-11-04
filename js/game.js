@@ -2,12 +2,13 @@
 // ───────── 基礎 ─────────
 const $ = s => document.querySelector(s);
 const cv = $('#cv'), ctx = cv.getContext('2d');
-let W = 0, H = 0;
+let W = 0, H = 0, Z = 1, VW = 0, VH = 0, DPR = 1;
+const COARSE = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
 function resize() {
-  const d = Math.min(devicePixelRatio || 1, 2);
+  DPR = Math.min(devicePixelRatio || 1, COARSE ? 1.5 : 2);
   W = innerWidth; H = innerHeight;
-  cv.width = W * d; cv.height = H * d;
-  ctx.setTransform(d, 0, 0, d, 0, 0);
+  Z = Math.max(.62, Math.min(1, Math.min(W, H) / 640)); VW = W / Z; VH = H / Z;
+  cv.width = W * DPR; cv.height = H * DPR;
 }
 addEventListener('resize', resize); resize();
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -50,7 +51,6 @@ async function loadAll() {
   // 色相變體（像素運算，Safari 也能用）
   IMG.tint = {}; IMG.char = {};
   IMG.tint.robot200 = tintImg(IMG.robot, 200, 1);
-  BOSSES.forEach((b, k) => IMG.tint['boss' + k] = IMG.hero.Run.map(f => tintImg(f, b.hue, .95)));
   for (const c of CHARS) { c.kit = c.id; IMG.char[c.id] = {}; for (const set of ['Idle', 'Run', 'RunShoot']) IMG.char[c.id][set] = IMG.hero[set].map(f => c.hue || c.br !== 1 ? tintImg(f, c.hue, c.br) : f); }
   await loadPack();
 }
@@ -111,12 +111,26 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => { keys.clear(); if (S.mode === 'play') setMode('paused'); });
-cv.addEventListener('touchstart', e => { const t = e.changedTouches[0]; joy = { id: t.identifier, x0: t.clientX, y0: t.clientY, x: 0, y: 0 }; $('#touch').hidden = S.mode !== 'play'; }, { passive: true });
-cv.addEventListener('touchmove', e => { if (!joy) return; for (const t of e.changedTouches) if (t.identifier === joy.id) { joy.x = t.clientX - joy.x0; joy.y = t.clientY - joy.y0; } }, { passive: true });
-const endTouch = e => { if (joy) for (const t of e.changedTouches) if (t.identifier === joy.id) joy = null; };
+const jEl = $('#joy'), jKnob = $('#joyKnob'), JR = 54;
+function joyShow(on) { jEl.hidden = !on; }
+cv.addEventListener('touchstart', e => {
+  e.preventDefault(); if (joy || S.mode !== 'play') return; const t = e.changedTouches[0];
+  joy = { id: t.identifier, x0: t.clientX, y0: t.clientY, x: 0, y: 0 }; jEl.style.left = t.clientX + 'px'; jEl.style.top = t.clientY + 'px'; jKnob.style.transform = 'translate(-50%,-50%)'; joyShow(true);
+}, { passive: false });
+cv.addEventListener('touchmove', e => {
+  e.preventDefault(); if (!joy) return;
+  for (const t of e.changedTouches) if (t.identifier === joy.id) {
+    let dx = t.clientX - joy.x0, dy = t.clientY - joy.y0; const l = Math.hypot(dx, dy);
+    if (l > JR) { joy.x0 += dx / l * (l - JR); joy.y0 += dy / l * (l - JR); dx = t.clientX - joy.x0; dy = t.clientY - joy.y0; jEl.style.left = joy.x0 + 'px'; jEl.style.top = joy.y0 + 'px'; }
+    joy.x = dx; joy.y = dy; jKnob.style.transform = `translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px))`;
+  }
+}, { passive: false });
+const endTouch = e => { if (joy) for (const t of e.changedTouches) if (t.identifier === joy.id) { joy = null; joyShow(false); } };
 cv.addEventListener('touchend', endTouch); cv.addEventListener('touchcancel', endTouch);
-$('#tDash').addEventListener('touchstart', e => { e.stopPropagation(); if (S.mode === 'play') dash(); });
-$('#tGiga').addEventListener('touchstart', e => { e.stopPropagation(); if (S.mode === 'play') giga(); });
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('visibilitychange', () => { if (document.hidden && S.mode === 'play') setMode('paused'); });
+const tap = (id, fn) => $(id).addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); fn(); }, { passive: false });
+tap('#tDash', () => S.mode === 'play' && dash()); tap('#tGiga', () => S.mode === 'play' && giga()); tap('#tPause', () => S.mode === 'play' && setMode('paused'));
 
 // ───────── 狀態 ─────────
 const S = { mode: 'title', cards: null };
@@ -138,7 +152,7 @@ function setMode(m) {
   S.mode = m;
   $('#title').hidden = m !== 'title'; $('#cards').hidden = m !== 'cards';
   $('#pause').hidden = m !== 'paused'; $('#over').hidden = m !== 'over';
-  $('#hud').hidden = m === 'title'; $('#touch').hidden = !(m === 'play' && 'ontouchstart' in window);
+  $('#hud').hidden = m === 'title'; $('#touch').hidden = !(m === 'play' && COARSE); if (m !== 'play') { joy = null; joyShow(false); }
 }
 
 // ───────── 能力值 ─────────
@@ -281,28 +295,52 @@ function boom(x, y, R, dmg) {
 // ───────── 敵人／首領 ─────────
 function spawnEnemy() {
   const avail = Object.entries(ENEMIES).filter(([, d]) => G.t >= d.from);
-  const w = avail.map(([k]) => ({ grunt: 6, runner: 4, shooter: 2.5, tank: 1 }[k])); let r = Math.random() * w.reduce((a, b) => a + b), i = 0;
+  const w = avail.map(([, q]) => q.w); let r = Math.random() * w.reduce((a, b) => a + b), i = 0;
   while ((r -= w[i]) > 0) i++;
-  const [type, d] = avail[i], a = rnd(0, 6.283), R = Math.max(W, H) * .62 + 40, m = G.t / 60;
+  const [type, d] = avail[i], a = rnd(0, 6.283), R = Math.max(VW, VH) * .62 + 40, m = G.t / 60;
   const hp = d.hp * (1 + m * .28 + m * m * .02);
-  G.en.push({ type, d, x: G.p.x + Math.cos(a) * R, y: G.p.y + Math.sin(a) * R, hp, hpMax: hp, r: d.r, xp: d.xp, spd: d.spd * rnd(.92, 1.08), cd: rnd(0, d.shoot || 1), hit: 0, slow: 0, ang: 0 });
+  G.en.push({ type, d, x: G.p.x + Math.cos(a) * R, y: G.p.y + Math.sin(a) * R, hp, hpMax: hp, r: d.r, xp: d.xp, spd: d.spd * rnd(.92, 1.08), cd: rnd(0, d.shoot || 1.5), ph: rnd(0, 6.283), fuse: 0, leap: 0, hit: 0, slow: 0, ang: 0 });
 }
 function spawnBoss() {
   const b = BOSSES[G.bossIdx], a = rnd(0, 6.283), m = G.t / 60;
-  G.boss = { boss: true, def: b, idx: G.bossIdx, x: G.p.x + Math.cos(a) * 520, y: G.p.y + Math.sin(a) * 520, hp: b.hp, hpMax: b.hp, r: 34 * b.scale / 1.7, spd: 62, hit: 0, slow: 0, cd: 2.5, state: 'walk', st: 0, dir: 1, ang: 0 };
+  G.boss = { boss: true, def: b, idx: G.bossIdx, x: G.p.x + Math.cos(a) * 520, y: G.p.y + Math.sin(a) * 520, hp: b.hp, hpMax: b.hp, r: 46 * b.scale / 1.7, spd: 62, q: [], hit: 0, slow: 0, cd: 2.5, state: 'walk', st: 0, dir: 1, ang: 0 };
   $('#bossBar').hidden = false; $('#bossName').textContent = b.name; G.shake = .4; sfx('boom');
 }
-function ring(b, n, spd, off = 0) { for (let i = 0; i < n; i++) { const a = off + i * 6.283 / n; G.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, dmg: 10 + b.idx * 2, life: 5, r: 7 }); } }
+function ring(b, n, spd, off = 0, r = 7) { for (let i = 0; i < n; i++) { const a = off + i * 6.283 / n; G.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, dmg: 10 + b.idx * 2, life: 5, r }); } }
+function aimed(b, a, spd, r = 6, dmg) { G.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, dmg: dmg || 12 + b.idx * 2, life: 4, r }); }
+const later = (b, t, fn) => b.q.push({ t, fn });
+// 各首領專屬招式
+const BOSS_ATK = {
+  stomp(b, ang) { // 象王：震地環＋飛彈齊射
+    if (Math.random() < .5) { G.shake = .3; sfx('boom'); G.fx.push({ k: 'nova', x: b.x, y: b.y, R: 160, t: .4, T: .4, c: '#c9d27a' }); ring(b, 16, 120, rnd(0, 6), 9); later(b, .45, () => ring(b, 16, 190, rnd(0, 6), 7)); }
+    else { sfx('shot'); for (let i = 0; i < 7; i++) later(b, i * .1, () => aimed(b, ang + rnd(-.35, .35), rnd(190, 250), 9)); }
+  },
+  fan(b, ang) { // 龍王：火息扇形
+    sfx('flame'); for (let k = 0; k < 3; k++) later(b, k * .28, () => { const a0 = Math.atan2(G.p.y - b.y, G.p.x - b.x); for (let i = -4; i <= 4; i++) aimed(b, a0 + i * .1, 190 + Math.abs(i) * 8 + k * 20, 7); });
+  },
+  spiral(b) { // 獅王：冰晶螺旋
+    sfx('ice'); for (let k = 0; k < 8; k++) later(b, k * .16, () => { ring(b, 3, 170, k * .55, 7); ring(b, 3, 170, k * .55 + 3.14, 7); });
+    later(b, 1.4, () => ring(b, 14, 150, rnd(0, 6), 7));
+  },
+  bolt(b, ang) { // 獸王：雷擊連射＋閃現
+    sfx('zap'); for (let k = 0; k < 4; k++) later(b, k * .22, () => { const a0 = Math.atan2(G.p.y - b.y, G.p.x - b.x); for (let i = -1; i <= 1; i++) aimed(b, a0 + i * .07, 380, 5); });
+    later(b, .9, () => { const q = rnd(0, 6.283); G.fx.push({ k: 'puff', x: b.x, y: b.y, t: .3, T: .3 }); b.x = G.p.x + Math.cos(q) * 300; b.y = G.p.y + Math.sin(q) * 300; G.fx.push({ k: 'nova', x: b.x, y: b.y, R: 90, t: .3, T: .3, c: '#fff36a' }); sfx('dash'); });
+  },
+};
+function bossAtk(b, ang) {
+  const pat = b.def.pat === 'all' ? ['stomp', 'fan', 'spiral', 'bolt'][(Math.random() * 4) | 0] : b.def.pat;
+  BOSS_ATK[pat](b, ang);
+  if (b.def.pat === 'all' && b.hp < b.hpMax * .5 && Math.random() < .5) later(b, .6, () => ring(b, 20, 140, rnd(0, 6), 6));
+}
 function updateBoss(b, dt) {
   const p = G.p, d = b.def, ang = Math.atan2(p.y - b.y, p.x - b.x); b.dir = Math.cos(ang) >= 0 ? 1 : -1; b.ang = ang;
   if (b.slow > 0) b.slow -= dt; b.hit = Math.max(0, b.hit - dt);
+  for (const q of b.q) q.t -= dt; for (const q of b.q) if (q.t <= 0) q.fn(); b.q = b.q.filter(q => q.t > 0);
   const sp = b.spd * (b.slow > 0 ? .5 : 1);
   if (b.state === 'walk') {
     b.x += Math.cos(ang) * sp * dt; b.y += Math.sin(ang) * sp * dt; b.cd -= dt;
-    if (b.cd <= 0) { const r = Math.random(); b.cd = 3.2 - Math.min(1.2, b.idx * .25);
-      if (r < .4) { b.state = 'tele'; b.st = .7; b.lock = ang; }
-      else if (r < .75) { ring(b, 14 + b.idx * 3, 150 + b.idx * 12, rnd(0, 6)); if (b.idx >= 2) setTimeout(() => G.boss === b && ring(b, 14 + b.idx * 3, 150, .2), 450); sfx('shot'); }
-      else { for (let i = -2; i <= 2; i++) { const a = ang + i * .16; G.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 230, vy: Math.sin(a) * 230, dmg: 12 + b.idx * 2, life: 4, r: 7 }); } sfx('shot'); } }
+    if (b.cd <= 0) { b.cd = 3.2 - Math.min(1.2, b.idx * .25);
+      if (Math.random() < .35) { b.state = 'tele'; b.st = .7; b.lock = ang; } else bossAtk(b, ang); }
   } else if (b.state === 'tele') { b.st -= dt; if (b.st <= 0) { b.state = 'dash'; b.st = .55; sfx('dash'); } }
   else if (b.state === 'dash') { b.st -= dt; b.x += Math.cos(b.lock) * 430 * dt; b.y += Math.sin(b.lock) * 430 * dt; if (b.st <= 0) b.state = 'walk'; }
   if (dist2(p, b) < (b.r + 16) ** 2) hurtPlayer(18 + b.idx * 3);
@@ -349,12 +387,13 @@ function showCards(head, cards, foot, opts = {}) {
 function renderCards() {
   const c = S.cards;
   $('#cardsHead').innerHTML = c.head;
-  $('#cardsFoot').textContent = c.reroll ? `R 重抽（剩 ${G.rerolls} 次）` : c.foot || '';
+  $('#cardsFoot').innerHTML = c.reroll ? `<button id="rr"${G.rerolls <= 0 ? ' disabled' : ''}>R　重抽（剩 ${G.rerolls} 次）</button>` : c.foot || '';
   $('#cardsRow').innerHTML = c.list.map((k, i) => `<div class="card ${k.cls}" data-i="${i}"><div class="tag">${k.tag}</div>
     <div class="head"><div class="ico">${k.icon}</div><div class="nm">${k.name}</div></div>
     <div class="art">${k.art}</div><div class="ds">${k.desc}</div>
     <div class="rows">${k.rows.map(r => `<div><span>${r[0]}</span><b>${r[1]}</b></div>`).join('')}</div><span class="key">${i + 1}</span></div>`).join('');
 }
+$('#cardsFoot').addEventListener('click', e => { if (e.target.closest('#rr') && S.cards) rerollCards(); });
 $('#cardsRow').addEventListener('click', e => { const el = e.target.closest('.card'); if (el) chooseCard(+el.dataset.i); });
 function chooseCard(i) {
   const k = S.cards && S.cards.list[i]; if (!k) return;
@@ -391,7 +430,7 @@ function hudTick() {
   $('#hpFill').style.width = Math.max(0, p.hp / p.maxHp * 100) + '%'; $('#hpTxt').textContent = `${Math.ceil(Math.max(0, p.hp))} / ${p.maxHp}`;
   $('#xpFill').style.width = p.xp / xpNeed(p.lv) * 100 + '%'; $('#lvTxt').textContent = 'Lv ' + p.lv;
   $('#timer').textContent = fmt(G.t);
-  $('#gigaFill').style.height = G.giga + '%'; $('#gigaBox').classList.toggle('ready', G.giga >= 100);
+  $('#gigaFill').style.height = G.giga + '%'; $('#gigaBox').classList.toggle('ready', G.giga >= 100); $('#tGiga').classList.toggle('ready', G.giga >= 100); $('#tGiga').style.setProperty('--f', G.giga + '%');
 }
 
 // ───────── 主更新 ─────────
@@ -429,11 +468,13 @@ function update(dt) {
   // 敵人
   for (const e of G.en) {
     if (e.dead) continue; e.hit = Math.max(0, e.hit - dt); if (e.slow > 0) e.slow -= dt;
-    const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1, s = e.spd * (e.slow > 0 ? .5 : 1); e.ang = Math.atan2(dy, dx);
+    const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1; let s = e.spd * (e.slow > 0 ? .5 : 1); e.ang = Math.atan2(dy, dx);
+    if (e.d.leap) { e.cd -= dt; if (e.leap > 0) { e.leap -= dt; s *= 3.4; } else if (e.cd <= 0 && d < 340) { e.leap = .4; e.cd = 2.2 + rnd(0, 1.2); } }
+    if (e.d.bomb) { if (e.fuse > 0) { e.fuse -= dt; s *= .3; if (e.fuse <= 0) { G.fx.push({ k: 'nova', x: e.x, y: e.y, R: 80, t: .3, T: .3, c: '#ff8a3a' }); sfx('boom'); if (Math.hypot(p.x - e.x, p.y - e.y) < 80) hurtPlayer(22); killEnemy(e); continue; } } else if (d < e.r + 46) e.fuse = .65; }
     if (e.d.shoot) {
       if (d > 250) { e.x += dx / d * s * dt; e.y += dy / d * s * dt; } else if (d < 170) { e.x -= dx / d * s * dt; e.y -= dy / d * s * dt; }
-      e.cd -= dt; if (e.cd <= 0 && d < 520) { e.cd = e.d.shoot; G.eb.push({ x: e.x, y: e.y, vx: dx / d * 190, vy: dy / d * 190, dmg: 8, life: 4, r: 5 }); }
-    } else { e.x += dx / d * s * dt; e.y += dy / d * s * dt; }
+      e.cd -= dt; if (e.cd <= 0 && d < 520) { e.cd = e.d.shoot; for (const o of e.d.fan ? [-.26, 0, .26] : [0]) { const a = e.ang + o; G.eb.push({ x: e.x, y: e.y, vx: Math.cos(a) * 190, vy: Math.sin(a) * 190, dmg: 8, life: 4, r: 5 }); } }
+    } else { e.x += dx / d * s * dt; e.y += dy / d * s * dt; if (e.d.weave) { const w = Math.sin(G.t * 4.5 + e.ph) * s * .9 * dt; e.x += -dy / d * w; e.y += dx / d * w; } }
     if (d < e.r + 14) hurtPlayer(e.d.dmg);
   }
   // 敵人互相擠開（粗略）
@@ -479,24 +520,24 @@ function makeBg() {
   return ctx.createPattern(c, 'repeat');
 }
 function draw() {
-  ctx.clearRect(0, 0, W, H);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H);
   if (!G) return;
   const p = G.p, sh = G.shake > 0 ? G.shake * 10 : 0;
-  const cx = p.x - W / 2 + rnd(-sh, sh), cy = p.y - H / 2 + rnd(-sh, sh);
+  const cx = p.x - VW / 2 + rnd(-sh, sh), cy = p.y - VH / 2 + rnd(-sh, sh);
   bgPat = bgPat || makeBg();
-  ctx.save(); ctx.translate(-cx, -cy); ctx.fillStyle = bgPat; ctx.fillRect(cx, cy, W, H);
+  ctx.save(); ctx.scale(Z, Z); ctx.translate(-cx, -cy); ctx.fillStyle = bgPat; ctx.fillRect(cx, cy, VW, VH);
   // 寶石
   for (const g of G.gems) { ctx.fillStyle = g.heal ? '#ff6b7e' : '#57d8ff'; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(g.x, g.y, g.heal ? 6 : 4 + Math.min(3, g.v / 2), 0, 6.283); ctx.fill(); }
   ctx.shadowBlur = 0;
   // 敵人（依 y 排序）
   const list = [...G.en]; if (G.boss) list.push(G.boss); list.sort((a, b) => a.y - b.y);
   for (const e of list) {
-    if (e.x < cx - 120 || e.x > cx + W + 120 || e.y < cy - 120 || e.y > cy + H + 120) continue;
+    if (e.x < cx - 160 || e.x > cx + VW + 160 || e.y < cy - 160 || e.y > cy + VH + 160) continue;
     if (e.boss) { drawBoss(e); continue; }
-    const im = e.d.hue ? IMG.tint.robot200 : IMG[e.d.img]; const sc = e.d.scale;
+    const im = e.d.art ? ART.small[e.d.art][((G.t * 8 + e.ph) | 0) % 2] : e.d.hue ? IMG.tint.robot200 : IMG[e.d.img]; const sc = e.d.scale;
     ctx.save(); ctx.translate(e.x, e.y); ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(0, e.r * .6, e.r, e.r * .4, 0, 0, 6.283); ctx.fill();
     ctx.rotate(e.ang); ctx.drawImage(im, -im.width * sc / 2, -im.height * sc / 2, im.width * sc, im.height * sc);
-    if (e.hit > 0) { ctx.globalAlpha = .6; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, e.r, 0, 6.283); ctx.fill(); }
+    if (e.hit > 0 || (e.fuse > 0 && ((G.t * 14) | 0) % 2)) { ctx.globalAlpha = .6; ctx.fillStyle = e.fuse > 0 ? '#ffd24a' : '#fff'; ctx.beginPath(); ctx.arc(0, 0, e.r, 0, 6.283); ctx.fill(); }
     if (e.slow > 0) { ctx.globalAlpha = .35; ctx.fillStyle = '#7fd8ff'; ctx.beginPath(); ctx.arc(0, 0, e.r, 0, 6.283); ctx.fill(); }
     ctx.restore();
   }
@@ -527,11 +568,11 @@ function drawHero() {
   if (G.shieldOn) { ctx.save(); ctx.strokeStyle = 'rgba(127,224,255,.85)'; ctx.fillStyle = 'rgba(127,224,255,.12)'; ctx.lineWidth = 3; ctx.shadowColor = '#7fe0ff'; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(p.x, p.y - 6, 46 + Math.sin(G.t * 6) * 2, 0, 6.283); ctx.fill(); ctx.stroke(); ctx.restore(); }
 }
 function drawBoss(b) {
-  const fr = IMG.tint['boss' + b.idx], im = fr[((G.t * 10) | 0) % fr.length]; const h = 96 * b.def.scale, w = im.width / im.height * h;
-  ctx.save(); ctx.translate(b.x, b.y); ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(0, h * .3, h * .24, h * .08, 0, 0, 6.283); ctx.fill();
+  const fr = ART.bosses[b.idx], im = fr[((G.t * 5) | 0) % fr.length]; const h = 230 * b.def.scale / 1.7, w = h;
+  ctx.save(); ctx.translate(b.x, b.y); ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(0, h * .3, h * .32, h * .08, 0, 0, 6.283); ctx.fill();
   if (b.state === 'tele') { ctx.strokeStyle = `rgba(255,70,90,${.4 + .4 * Math.sin(G.t * 40)})`; ctx.lineWidth = 26; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(b.lock) * 430 * .55, Math.sin(b.lock) * 430 * .55); ctx.stroke(); }
   ctx.scale(b.dir, 1); ctx.drawImage(im, -w / 2, -h / 2 - 8, w, h);
-  if (b.hit > 0) { ctx.globalAlpha = .45; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, b.r, 0, 6.283); ctx.fill(); }
+  if (b.hit > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .35; ctx.drawImage(im, -w / 2, -h / 2 - 8, w, h); ctx.globalCompositeOperation = 'source-over';}
   ctx.restore();
 }
 function drawFx(f) {

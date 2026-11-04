@@ -2,7 +2,10 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#050a18">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>機甲倖存者</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -21,9 +24,11 @@
   <div id="bossBar" hidden><span id="bossName"></span><div class="bar boss"><i id="bossFill"></i></div></div>
 </div>
 
+<div id="joy" hidden><i id="joyKnob"></i></div>
 <div id="touch" hidden>
-  <button id="tDash">衝刺</button>
+  <button id="tPause" aria-label="暫停">II</button>
   <button id="tGiga">大招</button>
+  <button id="tDash">衝刺</button>
 </div>
 
 <section id="title" class="screen">
@@ -59,6 +64,7 @@
 
 <script src="js/data.js"></script>
 <script src="js/icons.js"></script>
+<script src="js/art.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>

@@ -61,18 +61,22 @@ const SYNERGIES = [
 const SYN_BASE = 0.15, SYN_AMP = 0.05;
 
 const ENEMIES = {
-  grunt:  {img:'robot',  hp:22,  spd:58,  dmg:8,  r:14, scale:1.5, xp:1, from:0},
-  runner: {img:'zombie', hp:13,  spd:108, dmg:6,  r:11, scale:1.35,xp:1, from:30},
-  shooter:{img:'soldier',hp:26,  spd:46,  dmg:6,  r:14, scale:1.5, xp:2, from:75, shoot:2.2},
-  tank:   {img:'robot',  hp:130, spd:38,  dmg:15, r:24, scale:2.5, xp:5, from:150, hue:200},
+  grunt:  {w:6, img:'robot',  hp:22,  spd:58,  dmg:8,  r:14, scale:1.5, xp:1, from:0},
+  runner: {w:4, img:'zombie', hp:13,  spd:108, dmg:6,  r:11, scale:1.35,xp:1, from:30},
+  shooter:{w:2.5, img:'soldier',hp:26,  spd:46,  dmg:6,  r:14, scale:1.5, xp:2, from:75, shoot:2.2},
+  drone:   {w:3.5, art:'drone',    hp:16,  spd:96,  dmg:6,  r:12, scale:1,   xp:1, from:45,  weave:1},
+  spider:  {w:2.5, art:'spider',   hp:36,  spd:66,  dmg:9,  r:15, scale:1,   xp:2, from:100, leap:1},
+  bomber:  {w:1.8, art:'bomber',   hp:20,  spd:92,  dmg:0,  r:14, scale:1,   xp:2, from:130, bomb:1},
+  sentinel:{w:.8,  art:'sentinel', hp:160, spd:34,  dmg:14, r:22, scale:1,   xp:6, from:200, shoot:2.6, fan:1},
+  tank:   {w:1, img:'robot',  hp:130, spd:38,  dmg:15, r:24, scale:2.5, xp:5, from:150, hue:200},
 };
 
 const BOSSES = [
-  {name:'引爆象王', hue:25,  scale:1.7, hp:1400, weapon:'missile'},
-  {name:'烈焰龍王', hue:350, scale:1.8, hp:2300, weapon:'flame'},
-  {name:'冰霜獅王', hue:190, scale:1.8, hp:3400, weapon:'ice'},
-  {name:'雷霆獸王', hue:55,  scale:1.9, hp:4800, weapon:null},
-  {name:'終焉機神', hue:280, scale:2.3, hp:7500, weapon:null, final:true},
+  {name:'引爆象王', hue:25,  scale:1.7, hp:1400, weapon:'missile', pat:'stomp'},
+  {name:'烈焰龍王', hue:350, scale:1.8, hp:2300, weapon:'flame', pat:'fan'},
+  {name:'冰霜獅王', hue:190, scale:1.8, hp:3400, weapon:'ice', pat:'spiral'},
+  {name:'雷霆獸王', hue:55,  scale:1.9, hp:4800, weapon:null, pat:'bolt'},
+  {name:'終焉機神', hue:280, scale:2.3, hp:7500, weapon:null, final:true, pat:'all'},
 ];
 const BOSS_EVERY = 120;   // 秒
 const WIN_TIME = 12 * 60; // 秒
