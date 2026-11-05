@@ -76,7 +76,7 @@ const BOSSES = [
   {name:'烈焰龍王', hue:350, scale:1.8, hp:2300, weapon:'flame', pat:'fan'},
   {name:'冰霜獅王', hue:190, scale:1.8, hp:3400, weapon:'ice', pat:'spiral'},
   {name:'雷霆獸王', hue:55,  scale:1.9, hp:4800, weapon:null, pat:'bolt'},
-  {name:'終焉機神', hue:280, scale:2.3, hp:7500, weapon:null, final:true, pat:'all'},
+  {name:'終焉機神', hue:280, scale:2.3, hp:7500, weapon:null, final:true, pat:'all', sprite:true},
 ];
 const BOSS_EVERY = 120;   // 秒
 const WIN_TIME = 12 * 60; // 秒

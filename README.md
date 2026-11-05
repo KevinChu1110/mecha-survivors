@@ -46,5 +46,6 @@ python3 -m http.server 8000   # 然後開 http://localhost:8000
 程式碼採 MIT 授權。素材皆為 CC0：
 - 主角：[The Robot – Free Sprite](https://opengameart.org/content/the-robot-free-sprite)（pzUH）
 - 敵人：[Topdown Shooter](https://opengameart.org/content/topdown-shooter)（Kenney）
+- 最終首領「終焉機神」：[Sci-fi Lab Mecha Boss](https://foozlecc.itch.io/sci-fi-lab-mecha-boss)（Foozle，CC0，授權見 `assets/licenses/`）
 - 音樂：[Boss Fight 2](https://opengameart.org/content/boss-fight-2)（ansimuz）
 - 音效：以 WebAudio 即時合成

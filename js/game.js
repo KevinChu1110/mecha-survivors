@@ -47,12 +47,19 @@ async function loadAll() {
     for (let i = 1; i <= c; i++) jobs.push(loadImg(`assets/hero/${n}_${i}.png`).then(im => IMG.hero[n][i - 1] = im));
   }
   for (const k of ['robot', 'zombie', 'soldier']) jobs.push(loadImg(`assets/enemy/${k}.png`).then(im => IMG[k] = im));
+  jobs.push(loadImg('assets/boss/final-run.png').then(im => IMG.mechaRun = sliceSheet(im, 80, 64, 4)));
   await Promise.all(jobs);
   // 色相變體（像素運算，Safari 也能用）
   IMG.tint = {}; IMG.char = {};
   IMG.tint.robot200 = tintImg(IMG.robot, 200, 1);
   for (const c of CHARS) { c.kit = c.id; IMG.char[c.id] = {}; for (const set of ['Idle', 'Run', 'RunShoot']) IMG.char[c.id][set] = IMG.hero[set].map(f => c.hue || c.br !== 1 ? tintImg(f, c.hue, c.br) : f); }
   await loadPack();
+}
+// 橫向排列的影格圖切成多格；k 倍最近鄰放大，保持像素風
+function sliceSheet(im, fw, fh, k) {
+  const out = [];
+  for (let i = 0; i < Math.round(im.width / fw); i++) { const c = document.createElement('canvas'); c.width = fw * k; c.height = fh * k; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(im, i * fw, 0, fw, fh, 0, 0, fw * k, fh * k); out.push(c); }
+  return out;
 }
 function tintImg(im, hue, br) {
   const c = document.createElement('canvas'); c.width = im.width || 1; c.height = im.height || 1;
@@ -568,7 +575,7 @@ function drawHero() {
   if (G.shieldOn) { ctx.save(); ctx.strokeStyle = 'rgba(127,224,255,.85)'; ctx.fillStyle = 'rgba(127,224,255,.12)'; ctx.lineWidth = 3; ctx.shadowColor = '#7fe0ff'; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(p.x, p.y - 6, 46 + Math.sin(G.t * 6) * 2, 0, 6.283); ctx.fill(); ctx.stroke(); ctx.restore(); }
 }
 function drawBoss(b) {
-  const fr = ART.bosses[b.idx], im = fr[((G.t * 5) | 0) % fr.length]; const h = 230 * b.def.scale / 1.7, w = h;
+  const fr = (b.def.sprite && IMG.mechaRun && IMG.mechaRun.length ? IMG.mechaRun : ART.bosses[b.idx]), im = fr[((G.t * 9) | 0) % fr.length]; const h = 230 * b.def.scale / 1.7, w = h * im.width / im.height;
   ctx.save(); ctx.translate(b.x, b.y); ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(0, h * .3, h * .32, h * .08, 0, 0, 6.283); ctx.fill();
   if (b.state === 'tele') { ctx.strokeStyle = `rgba(255,70,90,${.4 + .4 * Math.sin(G.t * 40)})`; ctx.lineWidth = 26; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(b.lock) * 430 * .55, Math.sin(b.lock) * 430 * .55); ctx.stroke(); }
   ctx.scale(b.dir, 1); ctx.drawImage(im, -w / 2, -h / 2 - 8, w, h);
