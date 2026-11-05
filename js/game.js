@@ -605,5 +605,5 @@ function start() { newGame(chosen); setMode('play'); startMusic(); }
 $('#btnStart').addEventListener('click', start);
 $('#btnAgain').addEventListener('click', start);
 $('#btnResume').addEventListener('click', () => setMode('play'));
-loadAll().then(() => { G = null; renderChars(); setMode('title'); requestAnimationFrame(frame); });
+loadAll().then(() => { G = null; renderChars(); $('#btnStart').disabled = false; $('#btnStart').textContent = '開始'; setMode('title'); requestAnimationFrame(frame); });
 window.__mecha = { get G() { return G; }, S, BOSSES, update, giga, bossReward, levelUpUI };
