@@ -8,7 +8,7 @@ function resize() {
   DPR = Math.min(devicePixelRatio || 1, COARSE ? 1.5 : 2);
   W = innerWidth; H = innerHeight;
   Z = Math.max(.62, Math.min(1, Math.min(W, H) / 640)); VW = W / Z; VH = H / Z;
-  cv.width = W * DPR; cv.height = H * DPR;
+  cv.width = W * DPR; cv.height = H * DPR; cv.style.width = W + 'px'; cv.style.height = H + 'px';
 }
 addEventListener('resize', resize); resize();
 const rnd = (a, b) => a + Math.random() * (b - a);
